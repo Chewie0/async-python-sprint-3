@@ -4,4 +4,4 @@ __pycache__/
 *.pyc
 *.log
 *.sqlite
-upload_dir
+upload_dir/
