@@ -9,17 +9,13 @@ from sqlalchemy_file import FileField
 from sqlalchemy_file.storage import StorageManager
 from libcloud.storage.drivers.local import LocalStorageDriver
 from sqlalchemy_file.validators import SizeValidator
+from settings import basedir, PUBLIC_CHAT, PUBLIC_CHAT_ID, MAX_FILE_SIZE
 
-basedir = os.path.abspath(os.path.dirname(__file__))
 engine = create_engine('sqlite:///' + os.path.join(basedir, 'data.sqlite'), echo=True)
 Base = declarative_base()
 os.makedirs("./upload_dir/attachment", 0o777, exist_ok=True)
 container = LocalStorageDriver("./upload_dir").get_container("attachment")
 StorageManager.add_storage("default", container)
-
-PUBLIC_CHAT = 'Public_chat'
-PUBLIC_CHAT_ID = 1
-MAX_FILE_SIZE = '5M'
 
 
 class Chat_user(Base):

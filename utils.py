@@ -25,7 +25,7 @@ class HttpResponse:
         self.status = None
         self.auth_data = None
         self.contenttype = None
-        self.contlength = None
+        self.contlength = 0
     def on_url(self, url: bytes):
         self.url = url.decode().replace('/','')
     def on_status(self, status: bytes):

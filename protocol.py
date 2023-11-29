@@ -18,7 +18,6 @@ class HTTPProtocol(asyncio.Protocol):
         main_data = HttpResponse()
         p = httptools.HttpRequestParser(main_data)
         p.feed_data(data)
-        print(data)
         method = p.get_method().decode()
         logger.info(f"Request: {method} {main_data} ")
         self._handle_data(method, main_data)

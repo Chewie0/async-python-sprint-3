@@ -1,28 +1,17 @@
 import logging
-import os
 import uuid
 from datetime import datetime, timedelta
 from urllib.parse import urlparse, parse_qs
 from typing import Callable, TypeVar, ParamSpec
-from sqlalchemy import create_engine, desc
+from sqlalchemy import desc
+from sqlalchemy.exc import DatabaseError
 from sqlalchemy.orm import Session
 from sqlalchemy_file.exceptions import SizeValidationError
-from models import Chat, Chat_user, Message, User, PUBLIC_CHAT, PUBLIC_CHAT_ID, Comment, Attachment
+from models import Chat, Chat_user, Message, User, PUBLIC_CHAT, PUBLIC_CHAT_ID, Comment, Attachment, engine
 from utils import get_or_create, ResponseCustom, HttpResponse
+from settings import LAST_MESSAGE_COUNT, LIMIT_FOR_BUNNED, HOUR_FOR_BUNNED, RESP_CODE, T, P
 
 logger = logging.getLogger()
-basedir = os.path.abspath(os.path.dirname(__file__))
-engine = create_engine('sqlite:///' + os.path.join(basedir, 'data.sqlite'), echo=True)
-T = TypeVar('T')
-P = ParamSpec('P')
-LAST_MESSAGE_COUNT = 20
-LIMIT_FOR_BUNNED = 3
-HOUR_FOR_BUNNED = 4
-RESP_CODE = {'ok': 200,
-             'created': 201,
-             'err': 400,
-             'unauth': 401,
-             'not_found': 404}
 
 
 class Handler:
@@ -60,7 +49,8 @@ class Handler:
                     return user
                 else:
                     return None
-        except Exception:
+        except DatabaseError:
+            logger.error('Database error')
             return None
 
     @classmethod
@@ -77,7 +67,7 @@ class Handler:
             for message in messages]
         return tmp_dict
 
-#POST /start, body: {}
+
 @Handler.register('start')
 def start(data: HttpResponse) -> str:
     try:
@@ -118,8 +108,6 @@ def start(data: HttpResponse) -> str:
     return resp.get_resp
 
 
-#POST /send, body example to user: {"text":"Hi user!", "send_to_public":false, "send_to_user":"user"}
-#body example to public: {"text":"Hi all!", "send_to_public":true}
 @Handler.register('send')
 def send(data: HttpResponse) -> str:
     user_obj = Handler.check_auth(data.auth_data)
@@ -162,7 +150,6 @@ def send(data: HttpResponse) -> str:
     return resp.get_resp
 
 
-#POST /complain, body example: {"username":"user"}
 @Handler.register('complain')
 def complain_on_user(data: HttpResponse) -> str:
     user_obj = Handler.check_auth(data.auth_data)
@@ -181,7 +168,6 @@ def complain_on_user(data: HttpResponse) -> str:
     return resp.get_resp
 
 
-# POST /comment_message, body example: {"message_id":1, "comment":"AZAZA"}
 @Handler.register('comment_message')
 def comment_message(data: HttpResponse) -> str:
     user_obj = Handler.check_auth(data.auth_data)
@@ -202,7 +188,7 @@ def comment_message(data: HttpResponse) -> str:
                               resp_body={})
     return resp.get_resp
 
-#POST /file?message=1, body: binary file
+
 @Handler.register('file')
 def send_file(data: HttpResponse) -> str:
     user_obj = Handler.check_auth(data.auth_data)
@@ -214,7 +200,8 @@ def send_file(data: HttpResponse) -> str:
             try:
                 with Session(engine) as session:
                     file_uid = uuid.uuid4()
-                    att = Attachment(name=f"attachment_{user_obj.id}_{message_id}_{file_uid}", content=data.body, message_id=message_id)
+                    att = Attachment(name=f"attachment_{user_obj.id}_{message_id}_{file_uid}", content=data.body,
+                                     message_id=message_id)
                     session.add(att)
                     session.commit()
                 resp = ResponseCustom(resp_status=RESP_CODE['created'], resp_status_text='Created', resp_body={})
@@ -223,8 +210,5 @@ def send_file(data: HttpResponse) -> str:
             return resp.get_resp
     else:
         resp = ResponseCustom(resp_status=RESP_CODE['unauth'], resp_status_text='UNAUTHORIZED ',
-                                      resp_body={})
+                              resp_body={})
         return resp.get_resp
-
-
-

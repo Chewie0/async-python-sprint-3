@@ -12,12 +12,16 @@ class Server:
     def __init__(self, host: str = '127.0.0.1', port: int = 8000) -> None:
         self._host = host
         self._port = port
-        self._server: asyncio | None = None
+        self._server: asyncio.AbstractServer | None = None
 
     async def listen(self) -> None:
         loop = asyncio.get_event_loop()
         self._server = await loop.create_server(HTTPProtocol, self._host, self._port)
-        await self._server.serve_forever()
+        async with self._server:
+            try:
+                await self._server.serve_forever()
+            except asyncio.exceptions.CancelledError:
+                logger.error("Server cancelled")
 
     async def stop(self) -> None:
         self._server.close()

@@ -5,9 +5,11 @@ import os
 import socket
 import httptools
 from typing import Optional
-
+from logging import config
 from utils import HttpResponse
+from logging_conf import LOG_CONFIG
 
+logging.config.dictConfig(LOG_CONFIG)
 logger = logging.getLogger()
 
 
@@ -52,7 +54,7 @@ class Client:
             p = httptools.HttpResponseParser(main_data)
             p.feed_data(chunk)
             response = response + chunk
-            if len(chunk) >= int(main_data.contlength):
+            if len(response) >= int(main_data.contlength) if main_data else 0:
                 break
         self._response = response
         self._result = main_data.body
@@ -132,11 +134,11 @@ if __name__ == '__main__':
     client2 = Client(user_name='user2', password='pass')
 
     client1.send_start()  # регистрация пользователя, если такого не существует, и получение сообщений (последних 20, если новый пользователь или всех непрочитанных, если старый)
-    print(client1.response)
+    logger.info(client1.response)
 
     client1.send_message(message='Hello!')  # отправка сообщения в публичный чат
     client1.send_message(message='Hello, user2!', user='user2')  # отправка сообщения пользователю
-    client1.comment_message(message_id=1, comment='AZAZA')  # комментарии к сообщению
+    client1.comment_message(message_id=1, comment='AZAZA')  # комментарии к сообщению'''
     client1.complain(username="user2")  # жалоба на пользователя
 
     with open('testfile', 'a') as f: # создать тестовый файл для отправки
@@ -145,4 +147,4 @@ if __name__ == '__main__':
     client1.send_file(path_to_file='testfile', message_id=1) # отправка файла
 
     client2.send_start()
-    print(client2.response)
+    logger.info(client2.response)
