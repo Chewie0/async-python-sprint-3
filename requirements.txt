@@ -2,3 +2,4 @@ apache_libcloud==3.8.0
 httptools==0.6.1
 SQLAlchemy==2.0.23
 sqlalchemy_file==0.6.0
+fasteners==0.19

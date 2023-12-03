@@ -1,24 +1,23 @@
-import logging
 import uuid
 from datetime import datetime, timedelta
 from urllib.parse import urlparse, parse_qs
-from typing import Callable, TypeVar, ParamSpec
+from typing import Callable
 from sqlalchemy import desc
 from sqlalchemy.exc import DatabaseError
 from sqlalchemy.orm import Session
 from sqlalchemy_file.exceptions import SizeValidationError
-from models import Chat, Chat_user, Message, User, PUBLIC_CHAT, PUBLIC_CHAT_ID, Comment, Attachment, engine
-from utils import get_or_create, ResponseCustom, HttpResponse
-from settings import LAST_MESSAGE_COUNT, LIMIT_FOR_BUNNED, HOUR_FOR_BUNNED, RESP_CODE, T, P
-
-logger = logging.getLogger()
+from models import Chat, Chat_user, Message, User, Comment, Attachment
+from make_models import engine
+from utils import get_or_create, ResponseCustom, HttpResponse, logger
+from settings import LAST_MESSAGE_COUNT, LIMIT_FOR_BUNNED, HOUR_FOR_BUNNED, RESP_CODE, T, P, PUBLIC_CHAT, \
+    PUBLIC_CHAT_ID
 
 
 class Handler:
     objects = {}
 
     @classmethod
-    def register(cls, command: str) -> Callable[P, T]:
+    def register(cls, command: str) -> Callable[[P], T]:
         def decorator(func):
             cls.objects[command] = func
             return func
@@ -68,43 +67,54 @@ class Handler:
         return tmp_dict
 
 
-@Handler.register('start')
-def start(data: HttpResponse) -> str:
+@Handler.register('first_start')
+def first_start(data: HttpResponse) -> str:
     try:
         username = data.auth_data.split(':')[0]
         password = data.auth_data.split(':')[1]
         with Session(engine) as session:
             public_chat, _ = get_or_create(session, Chat, name=PUBLIC_CHAT)
-            user_obj, is_new = get_or_create(session, User, login=username)
-            tmp_dict = {}
-            if is_new:
-                logger.info(f"New user {data.auth_data.split(':')[0]}")
+            check_user = session.query(User).filter(User.login == username).first()
+            if not check_user:
+                logger.info(f"New user {username}")
+                tmp_dict = {}
+                user_obj, _ = get_or_create(session, User, login=username, password = password, last_connection = datetime.utcnow())
                 get_or_create(session, Chat_user, chat_id=public_chat.id, user_id=user_obj.id)
-                user_obj.password = password
                 last_messages = session.query(Message).filter(Message.chat_id == public_chat.id).order_by(
                     desc(Message.pub_date)).limit(LAST_MESSAGE_COUNT).all()
                 tmp_dict.update(Handler.get_messages_dict(public_chat.name, last_messages))
             else:
-                logger.info(f"Start user {data.auth_data.split(':')[0]}")
-                user_obj_auth = Handler.check_auth(data.auth_data)
-                if user_obj_auth:
-                    last_connection = user_obj.last_connection
-                    user_chats = session.query(Chat_user).filter(Chat_user.user_id == user_obj.id).all()
-                    for chat in user_chats:
-                        unread_messages = session.query(Message).filter(Message.chat_id == chat.chat_id,
-                                                                        Message.pub_date > last_connection).all()
-                        chat_obj = session.query(Chat).filter(Chat.id == chat.chat_id).first()
-                        tmp_dict.update(Handler.get_messages_dict(chat_obj.name, unread_messages))
-                else:
-                    resp = ResponseCustom(resp_status=RESP_CODE['unauth'], resp_status_text='UNAUTHORIZED ',
+                resp = ResponseCustom(resp_status=RESP_CODE['err'], resp_status_text='User already exists',
                                           resp_body={})
-                    return resp.get_resp
-            user_obj.last_connection = datetime.utcnow()
-            session.commit()
+                return resp.get_resp
+
         resp = ResponseCustom(resp_status=RESP_CODE['ok'], resp_status_text='OK', resp_body=tmp_dict)
     except Exception as e:
         logger.error(f'ERROR {e}')
         resp = ResponseCustom(resp_status=RESP_CODE['err'], resp_status_text='Bad request', resp_body={})
+    return resp.get_resp
+
+
+@Handler.register('get_messages')
+def get_messages(data: HttpResponse) -> str:
+    user_obj = Handler.check_auth(data.auth_data)
+    if user_obj.id:
+        logger.info(f"Get messages for user {user_obj.login}")
+        with Session(engine) as session:
+            tmp_dict = {}
+            last_connection = user_obj.last_connection
+            user_chats = session.query(Chat_user).filter(Chat_user.user_id == user_obj.id).all()
+            for chat in user_chats:
+                unread_messages = session.query(Message).filter(Message.chat_id == chat.chat_id,
+                                                                Message.pub_date > last_connection).all()
+                chat_obj = session.query(Chat).filter(Chat.id == chat.chat_id).first()
+                tmp_dict.update(Handler.get_messages_dict(chat_obj.name, unread_messages))
+            user_obj.last_connection = datetime.utcnow()
+            session.commit()
+        resp = ResponseCustom(resp_status=RESP_CODE['ok'], resp_status_text='OK', resp_body=tmp_dict)
+    else:
+        resp = ResponseCustom(resp_status=RESP_CODE['unauth'], resp_status_text='UNAUTHORIZED ',
+                              resp_body={})
     return resp.get_resp
 
 
@@ -156,6 +166,10 @@ def complain_on_user(data: HttpResponse) -> str:
     if user_obj.id:
         with Session(engine) as session:
             user_to_complain = session.query(User).filter_by(login=data.body.get("username")).first()
+            if not user_to_complain.id:
+                resp = ResponseCustom(resp_status=RESP_CODE['err'], resp_status_text='No such user for complain',
+                                      resp_body={})
+                return resp.get_resp
             user_to_complain.count_for_banned += 1
             if user_to_complain.count_for_banned >= LIMIT_FOR_BUNNED:
                 user_to_complain.banned_till = datetime.utcnow() + timedelta(hours=HOUR_FOR_BUNNED)

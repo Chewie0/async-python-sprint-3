@@ -1,16 +1,10 @@
 import base64
 import json
-import logging
 import os
 import socket
 import httptools
 from typing import Optional
-from logging import config
-from utils import HttpResponse
-from logging_conf import LOG_CONFIG
-
-logging.config.dictConfig(LOG_CONFIG)
-logger = logging.getLogger()
+from utils import HttpResponse, logger
 
 
 class Client:
@@ -42,7 +36,6 @@ class Client:
             head_list.remove('Content-Type: application/octet-stream')
         self._headers = "\r\n".join(head_list)
 
-
     def _send(self) -> None:
         sent = 0
         while sent < len(self._request):
@@ -66,19 +59,24 @@ class Client:
                 f'{body}'
         self._request = query.encode()
 
-
     def _make_file_request(self, body: bytes, method, path) -> None:
         query = f'{method} /{path} HTTP/1.1\r\n' \
                 f'Host:{self._server_host}:{self._server_port}\r\n' \
                 f'{self._headers}\r\n\r\n'
         self._request = query.encode() + body
 
-
-    def send_start(self) -> None:
-        logger.info('Get messages/register user')
+    def first_start(self) -> None:
+        logger.info('Register user and get 20 messages')
         body = ""
         self._make_headers(body.encode())
-        self._make_request(body, 'POST', 'start')
+        self._make_request(body, 'POST', 'first_start')
+        self._send()
+
+    def get_messages(self) -> None:
+        logger.info('Get unread messages')
+        body = ""
+        self._make_headers(body.encode())
+        self._make_request(body, 'POST', 'get_messages')
         self._send()
 
     def send_message(self, message: str, user: str | None = None) -> None:
@@ -108,7 +106,7 @@ class Client:
         self._make_request(body, 'POST', 'complain')
         self._send()
 
-    def send_file(self, path_to_file: str, message_id:int) -> None:
+    def send_file(self, path_to_file: str, message_id: int) -> None:
         logger.info('Send file')
         isExist = os.path.exists(path_to_file)
         if isExist:
@@ -128,23 +126,3 @@ class Client:
     def response(self) -> Optional[dict]:
         return self._result
 
-
-if __name__ == '__main__':
-    client1 = Client(user_name='user1', password='pass')
-    client2 = Client(user_name='user2', password='pass')
-
-    client1.send_start()  # регистрация пользователя, если такого не существует, и получение сообщений (последних 20, если новый пользователь или всех непрочитанных, если старый)
-    logger.info(client1.response)
-
-    client1.send_message(message='Hello!')  # отправка сообщения в публичный чат
-    client1.send_message(message='Hello, user2!', user='user2')  # отправка сообщения пользователю
-    client1.comment_message(message_id=1, comment='AZAZA')  # комментарии к сообщению'''
-    client1.complain(username="user2")  # жалоба на пользователя
-
-    with open('testfile', 'a') as f: # создать тестовый файл для отправки
-        f.write('test')
-
-    client1.send_file(path_to_file='testfile', message_id=1) # отправка файла
-
-    client2.send_start()
-    logger.info(client2.response)

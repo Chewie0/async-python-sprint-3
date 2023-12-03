@@ -1,10 +1,8 @@
 import asyncio
-import logging
 import httptools
 from handlers import Handler
 from utils import HttpResponse
-
-logger = logging.getLogger()
+from utils import logger
 
 
 class HTTPProtocol(asyncio.Protocol):
@@ -12,7 +10,7 @@ class HTTPProtocol(asyncio.Protocol):
     def connection_made(self, transport: asyncio.Transport) -> None:
         self.transport = transport
         addr = transport.get_extra_info('peername')
-        logger.info('Connection from {}'.format(addr))
+        logger.info(f'Connection from {addr}')
 
     def data_received(self, data: bytes) -> None:
         main_data = HttpResponse()
@@ -24,7 +22,7 @@ class HTTPProtocol(asyncio.Protocol):
 
     def _handle_data(self, method: str, main_data: HttpResponse) -> None:
         if method == "GET" and main_data.url == 'exit':
-            logger.info(f"Close connection")
+            logger.info("Close connection")
             self.transport.close()
         elif method == "POST":
             resp = Handler.handle(main_data)
@@ -35,11 +33,9 @@ class HTTPProtocol(asyncio.Protocol):
             logger.info(f"Close connection")
 
     def connection_lost(self, exception) -> None:
-        logging.info('Connection_lost')
+        logger.info('Connection_lost')
         super().connection_lost(exception)
 
     def eof_received(self) -> None:
-        logging.info('EOF received')
+        logger.info('EOF received')
         self.transport.close()
-
-

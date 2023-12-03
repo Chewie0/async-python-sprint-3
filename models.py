@@ -3,13 +3,12 @@ from sqlalchemy import Column, ForeignKey, Integer, String, DateTime, Text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from sqlalchemy import create_engine
-from sqlalchemy.orm import Session
 from sqlalchemy.sql import func
 from sqlalchemy_file import FileField
+from sqlalchemy_file.validators import SizeValidator
 from sqlalchemy_file.storage import StorageManager
 from libcloud.storage.drivers.local import LocalStorageDriver
-from sqlalchemy_file.validators import SizeValidator
-from settings import basedir, PUBLIC_CHAT, PUBLIC_CHAT_ID, MAX_FILE_SIZE
+from settings import basedir, MAX_FILE_SIZE
 
 engine = create_engine('sqlite:///' + os.path.join(basedir, 'data.sqlite'), echo=True)
 Base = declarative_base()
@@ -38,7 +37,7 @@ class Message(Base):
 class Attachment(Base):
     __tablename__ = "attachment"
     id = Column(Integer, autoincrement=True, primary_key=True)
-    name = Column(String(50), unique=True)
+    name = Column(String(150), unique=True)
     content = Column(FileField(validators=[SizeValidator(max_size=MAX_FILE_SIZE)]))
     message_id = Column(Integer, ForeignKey('message.id'))
 
@@ -73,14 +72,3 @@ class Chat(Base):
     name = Column(String(250), nullable=False)
     messages = relationship("Message", lazy='dynamic')
     user = relationship("User", secondary='chat_user', lazy='dynamic', back_populates='chat')
-
-
-if __name__ == '__main__':
-    Base.metadata.create_all(engine)
-    with Session(engine) as session:
-        public_chat = Chat(
-            id=PUBLIC_CHAT_ID,
-            name=PUBLIC_CHAT,
-        )
-        session.add(public_chat)
-        session.commit()

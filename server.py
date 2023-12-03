@@ -1,11 +1,6 @@
 import asyncio
-import logging
 from protocol import HTTPProtocol
-from logging import config
-from logging_conf import LOG_CONFIG
-
-logging.config.dictConfig(LOG_CONFIG)
-logger = logging.getLogger()
+from utils import logger
 
 
 class Server:
@@ -19,9 +14,10 @@ class Server:
         self._server = await loop.create_server(HTTPProtocol, self._host, self._port)
         async with self._server:
             try:
+                logger.info("Server start")
                 await self._server.serve_forever()
             except asyncio.exceptions.CancelledError:
-                logger.error("Server cancelled")
+                logger.info("Server stop")
 
     async def stop(self) -> None:
         self._server.close()

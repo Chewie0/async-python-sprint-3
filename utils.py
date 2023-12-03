@@ -1,6 +1,12 @@
 import base64
 import json
+import logging
+from logging import config
 from dataclasses import dataclass
+from logging_conf import LOG_CONFIG
+
+logging.config.dictConfig(LOG_CONFIG)
+logger = logging.getLogger()
 
 
 @dataclass
@@ -11,11 +17,11 @@ class ResponseCustom:
 
     @property
     def get_resp(self):
-        return  f'HTTP/1.1 {self.resp_status} {self.resp_status_text}\r\n'\
-                'Content-Type: application/json; charset=UTF-8\r\n' \
-                f'Content-Length: {str(len(json.dumps(self.resp_body)))}\r\n' \
-                '\r\n'\
-                f'{json.dumps(self.resp_body)}'
+        return f'HTTP/1.1 {self.resp_status} {self.resp_status_text}\r\n' \
+               'Content-Type: application/json; charset=UTF-8\r\n' \
+               f'Content-Length: {str(len(json.dumps(self.resp_body)))}\r\n' \
+               '\r\n' \
+               f'{json.dumps(self.resp_body)}'
 
 
 class HttpResponse:
@@ -26,10 +32,13 @@ class HttpResponse:
         self.auth_data = None
         self.contenttype = None
         self.contlength = 0
+
     def on_url(self, url: bytes):
-        self.url = url.decode().replace('/','')
+        self.url = url.decode().replace('/', '')
+
     def on_status(self, status: bytes):
         self.status = status.decode()
+
     def on_header(self, name: bytes, value: bytes):
         if name == b'Content-Type':
             val = value.decode("ISO-8859-1").split(' ')[0]
@@ -37,14 +46,16 @@ class HttpResponse:
         if name == b'Content-Length':
             val = value.decode("ISO-8859-1").split(' ')[0]
             self.contlength = val
-        if name ==b'Authorization':
+        if name == b'Authorization':
             val = value.decode("ISO-8859-1").split(' ')[1]
             self.auth_data = base64.b64decode(val).decode("UTF-8")
+
     def on_body(self, body: bytes):
         if 'application/json' not in self.contenttype:
             self.body = body
         else:
             self.body = json.loads(body.decode())
+
     def __str__(self):
         return f"{self.url}"
 
