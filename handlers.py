@@ -78,14 +78,15 @@ def first_start(data: HttpResponse) -> str:
             if not check_user:
                 logger.info(f"New user {username}")
                 tmp_dict = {}
-                user_obj, _ = get_or_create(session, User, login=username, password = password, last_connection = datetime.utcnow())
+                user_obj, _ = get_or_create(session, User, login=username, password=password,
+                                            last_connection=datetime.utcnow())
                 get_or_create(session, Chat_user, chat_id=public_chat.id, user_id=user_obj.id)
                 last_messages = session.query(Message).filter(Message.chat_id == public_chat.id).order_by(
                     desc(Message.pub_date)).limit(LAST_MESSAGE_COUNT).all()
                 tmp_dict.update(Handler.get_messages_dict(public_chat.name, last_messages))
             else:
                 resp = ResponseCustom(resp_status=RESP_CODE['err'], resp_status_text='User already exists',
-                                          resp_body={})
+                                      resp_body={})
                 return resp.get_resp
 
         resp = ResponseCustom(resp_status=RESP_CODE['ok'], resp_status_text='OK', resp_body=tmp_dict)
@@ -127,7 +128,8 @@ def send(data: HttpResponse) -> str:
             recipient_name = data.body.get("send_to_user")
             if user_obj.banned_till is None or user_obj.banned_till < datetime.utcnow():
                 if to_public:
-                    message = Message(text=data.body.get("text"), author_id=user_obj.id, chat_id=PUBLIC_CHAT_ID)
+                    message = Message(text=data.body.get("text"), author_id=user_obj.id, chat_id=PUBLIC_CHAT_ID,
+                                      pub_date=datetime.utcnow())
                     session.add(message)
                     session.commit()
                     resp = ResponseCustom(resp_status=RESP_CODE['created'], resp_status_text='Created', resp_body={})
@@ -148,7 +150,8 @@ def send(data: HttpResponse) -> str:
                         id_chat_to_send = new_chat.id
                     else:
                         id_chat_to_send = get_private_chat.id
-                    message = Message(text=data.body.get("text"), author_id=user_obj.id, chat_id=id_chat_to_send)
+                    message = Message(text=data.body.get("text"), author_id=user_obj.id, chat_id=id_chat_to_send,
+                                      pub_date=datetime.utcnow())
                     session.add(message)
                     session.commit()
                     resp = ResponseCustom(resp_status=RESP_CODE['created'], resp_status_text='Created', resp_body={})
