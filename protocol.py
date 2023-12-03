@@ -1,8 +1,7 @@
 import asyncio
 import httptools
 from handlers import Handler
-from utils import HttpResponse
-from utils import logger
+from utils import HttpResponse, logger
 
 
 class HTTPProtocol(asyncio.Protocol):
